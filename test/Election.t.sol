@@ -10,6 +10,8 @@ contract ElectionTest is Test {
     address public candidate1 = address(0xC1);
     address public candidate2 = address(0xC2);
     address public voter1 = address(0xD1);
+    address public voter2 = address(0xD2);
+    address public voter3 = address(0xD3);
 
     function setUp() public {
         e = new election();
@@ -252,5 +254,75 @@ contract ElectionTest is Test {
         vm.expectRevert(election.votedAlready.selector);
         e.vote(candidate1);
         vm.stopPrank();
+    }
+
+    // ---- Step 8: getWinner() / getWinnerDetails() ----
+
+    function test_GetWinner_ZeroBeforeAnyVotes() public {
+        e.createCandidates(candidate1, "Alice");
+        assertEq(e.getWinner(), 0);
+    }
+
+    function test_GetWinnerDetails_EmptyBeforeAnyVotes() public {
+        e.createCandidates(candidate1, "Alice");
+
+        (address addr, string memory name, uint256 votes) = e.getWinnerDetails();
+        assertEq(addr, address(0));
+        assertEq(name, "");
+        assertEq(votes, 0);
+    }
+
+    function test_GetWinnerDetails_AfterVoting() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1);
+
+        (address addr, string memory name, uint256 votes) = e.getWinnerDetails();
+        assertEq(addr, candidate1);
+        assertEq(name, "Alice");
+        assertEq(votes, 1);
+    }
+
+    function test_GetWinner_StaysWithLeaderOnTie() public {
+        e.createCandidates(candidate1, "Alice");
+        e.createCandidates(candidate2, "Bob");
+        e.registerVoters(20, voter1);
+        e.registerVoters(20, voter2);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1); // Alice: 1, takes the lead
+
+        vm.prank(voter2);
+        e.vote(candidate2); // Bob: 1, tied — Alice keeps the lead
+
+        (address addr, , ) = e.getWinnerDetails();
+        assertEq(addr, candidate1);
+    }
+
+    function test_GetWinner_ChangesWhenOvertaken() public {
+        e.createCandidates(candidate1, "Alice");
+        e.createCandidates(candidate2, "Bob");
+        e.registerVoters(20, voter1);
+        e.registerVoters(20, voter2);
+        e.registerVoters(20, voter3);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1); // Alice: 1, leads
+
+        vm.prank(voter2);
+        e.vote(candidate2); // Bob: 1, tied — Alice still leads
+
+        vm.prank(voter3);
+        e.vote(candidate2); // Bob: 2, now genuinely overtakes
+
+        (address addr, string memory name, uint256 votes) = e.getWinnerDetails();
+        assertEq(addr, candidate2);
+        assertEq(name, "Bob");
+        assertEq(votes, 2);
     }
 }
