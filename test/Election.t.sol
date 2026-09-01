@@ -165,4 +165,25 @@ contract ElectionTest is Test {
         vm.expectRevert(election.Election__notChairmanError.selector);
         e.endElection();
     }
+
+    // ---- Step 6: registerVoters() ----
+
+    function test_RegisterVoter_HappyPath() public {
+        bool success = e.registerVoters(20, candidate1);
+
+        assertTrue(success);
+        assertTrue(e.is18Year(candidate1));
+        assertEq(e.people(0), candidate1);
+    }
+
+    function test_RevertWhen_NonChairmanRegistersVoter() public {
+        vm.prank(candidate1);
+        vm.expectRevert(election.Election__notChairmanError.selector);
+        e.registerVoters(20, candidate2);
+    }
+
+    function test_RevertWhen_VoterUnder18() public {
+        vm.expectRevert(election.Not18yet.selector);
+        e.registerVoters(17, candidate1);
+    }
 }
