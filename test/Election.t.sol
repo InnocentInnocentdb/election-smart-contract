@@ -57,4 +57,34 @@ contract ElectionTest is Test {
         vm.expectRevert(election.candidateAlreadyExists.selector);
         e.createCandidates(candidate1, "Alice Again");
     }
+
+    // ---- Step 3: createParties() ----
+
+    function test_CreateParty_HappyPath() public {
+        uint256 id = e.createParties("Labour Party");
+
+        assertEq(id, 1);
+        assertEq(e.getPartyCount(), 1);
+        assertEq(e.parties(0), "Labour Party");
+    }
+
+    function test_CreateParty_SequentialIds() public {
+        e.createParties("Labour Party");
+        uint256 secondId = e.createParties("Unity Party");
+
+        assertEq(secondId, 2);
+        assertEq(e.getPartyCount(), 2);
+    }
+
+    function test_RevertWhen_NonChairmanCreatesParty() public {
+        vm.prank(candidate1);
+        vm.expectRevert(election.Election__notChairmanError.selector);
+        e.createParties("Labour Party");
+    }
+
+    function test_RevertWhen_DuplicatePartyName() public {
+        e.createParties("Labour Party");
+        vm.expectRevert(election.partyAlreadyExists.selector);
+        e.createParties("Labour Party");
+    }
 }
