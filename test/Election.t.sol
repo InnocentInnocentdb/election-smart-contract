@@ -87,4 +87,38 @@ contract ElectionTest is Test {
         vm.expectRevert(election.partyAlreadyExists.selector);
         e.createParties("Labour Party");
     }
+
+    // ---- Step 4: assignCandidateToParty() ----
+
+    function test_AssignCandidateToParty_HappyPath() public {
+        e.createCandidates(candidate1, "Alice");
+        e.createParties("Labour Party");
+
+        e.assignCandidateToParty(candidate1, 1);
+
+        assertEq(e.candidateParty(candidate1), 1);
+    }
+
+    function test_RevertWhen_NonChairmanAssignsParty() public {
+        e.createCandidates(candidate1, "Alice");
+        e.createParties("Labour Party");
+
+        vm.prank(candidate1);
+        vm.expectRevert(election.Election__notChairmanError.selector);
+        e.assignCandidateToParty(candidate1, 1);
+    }
+
+    function test_RevertWhen_AssigningNonexistentCandidate() public {
+        e.createParties("Labour Party");
+
+        vm.expectRevert(election.candidateDoesNotExist.selector);
+        e.assignCandidateToParty(candidate1, 1);
+    }
+
+    function test_RevertWhen_AssigningNonexistentParty() public {
+        e.createCandidates(candidate1, "Alice");
+
+        vm.expectRevert(election.partyDoesNotExist.selector);
+        e.assignCandidateToParty(candidate1, 1);
+    }
 }
