@@ -9,6 +9,7 @@ contract ElectionTest is Test {
     address public chairman = address(this);
     address public candidate1 = address(0xC1);
     address public candidate2 = address(0xC2);
+    address public voter1 = address(0xD1);
 
     function setUp() public {
         e = new election();
@@ -185,5 +186,71 @@ contract ElectionTest is Test {
     function test_RevertWhen_VoterUnder18() public {
         vm.expectRevert(election.Not18yet.selector);
         e.registerVoters(17, candidate1);
+    }
+
+    // ---- Step 7: vote() ----
+
+    function test_Vote_HappyPath() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1);
+
+        (, , uint256 votes) = e.candidates(0);
+        assertEq(votes, 1);
+        assertTrue(e.hasVoted(voter1));
+        assertEq(e.getWinner(), 1);
+    }
+
+    function test_RevertWhen_VotingBeforeElectionStarted() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+
+        vm.prank(voter1);
+        vm.expectRevert("wait for your chairman, getelection started function is not called yet");
+        e.vote(candidate1);
+    }
+
+    function test_RevertWhen_VotingAfterElectionEnded() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+        e.endElection();
+
+        vm.prank(voter1);
+        vm.expectRevert(election.electionAlreadyEnded.selector);
+        e.vote(candidate1);
+    }
+
+    function test_RevertWhen_VotingForUnknownCandidate() public {
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        vm.expectRevert(election.thisCandidateIsDeleted.selector);
+        e.vote(candidate1); // never created as a candidate
+    }
+
+    function test_RevertWhen_UnregisteredVoterVotes() public {
+        e.createCandidates(candidate1, "Alice");
+        e.getElectionStarted();
+
+        vm.prank(voter1); // never registered
+        vm.expectRevert(election.youAreNotRegistered.selector);
+        e.vote(candidate1);
+    }
+
+    function test_RevertWhen_VotingTwice() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+
+        vm.startPrank(voter1);
+        e.vote(candidate1);
+        vm.expectRevert(election.votedAlready.selector);
+        e.vote(candidate1);
+        vm.stopPrank();
     }
 }
