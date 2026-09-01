@@ -259,4 +259,111 @@ contract ElectionTest is Test {
     // ---- Step 8: getWinner() / getWinnerDetails() ----
 
     function test_GetWinner_ZeroBeforeAnyVotes() public {
-        e.createCandidates(candidate1, "
+        e.createCandidates(candidate1, "Alice");
+        assertEq(e.getWinner(), 0);
+    }
+
+    function test_GetWinnerDetails_EmptyBeforeAnyVotes() public {
+        e.createCandidates(candidate1, "Alice");
+
+        (address addr, string memory name, uint256 votes) = e.getWinnerDetails();
+        assertEq(addr, address(0));
+        assertEq(name, "");
+        assertEq(votes, 0);
+    }
+
+    function test_GetWinnerDetails_AfterVoting() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1);
+
+        (address addr, string memory name, uint256 votes) = e.getWinnerDetails();
+        assertEq(addr, candidate1);
+        assertEq(name, "Alice");
+        assertEq(votes, 1);
+    }
+
+    function test_GetWinner_StaysWithLeaderOnTie() public {
+        e.createCandidates(candidate1, "Alice");
+        e.createCandidates(candidate2, "Bob");
+        e.registerVoters(20, voter1);
+        e.registerVoters(20, voter2);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1); // Alice: 1, takes the lead
+
+        vm.prank(voter2);
+        e.vote(candidate2); // Bob: 1, tied — Alice keeps the lead
+
+        (address addr, , ) = e.getWinnerDetails();
+        assertEq(addr, candidate1);
+    }
+
+    function test_GetWinner_ChangesWhenOvertaken() public {
+        e.createCandidates(candidate1, "Alice");
+        e.createCandidates(candidate2, "Bob");
+        e.registerVoters(20, voter1);
+        e.registerVoters(20, voter2);
+        e.registerVoters(20, voter3);
+        e.getElectionStarted();
+
+        vm.prank(voter1);
+        e.vote(candidate1); // Alice: 1, leads
+
+        vm.prank(voter2);
+        e.vote(candidate2); // Bob: 1, tied — Alice still leads
+
+        vm.prank(voter3);
+        e.vote(candidate2); // Bob: 2, now genuinely overtakes
+
+        (address addr, string memory name, uint256 votes) = e.getWinnerDetails();
+        assertEq(addr, candidate2);
+        assertEq(name, "Bob");
+        assertEq(votes, 2);
+    }
+
+    // ---- Step 9: removeCandidates() ----
+
+    function test_RemoveCandidate_HappyPath() public {
+        e.createCandidates(candidate1, "Alice");
+        e.removeCandidates(candidate1);
+
+        assertEq(e.candidateIdToAddr(candidate1), 0);
+    }
+
+    function test_RevertWhen_NonChairmanRemovesCandidate() public {
+        e.createCandidates(candidate1, "Alice");
+
+        vm.prank(candidate2);
+        vm.expectRevert(election.Election__notChairmanError.selector);
+        e.removeCandidates(candidate1);
+    }
+
+    function test_RevertWhen_RemovingNonexistentCandidate() public {
+        vm.expectRevert(election.candidateDoesNotExist.selector);
+        e.removeCandidates(candidate1); // never created
+    }
+
+    function test_RevertWhen_RemovingCandidateTwice() public {
+        e.createCandidates(candidate1, "Alice");
+        e.removeCandidates(candidate1);
+
+        vm.expectRevert(election.candidateDoesNotExist.selector);
+        e.removeCandidates(candidate1);
+    }
+
+    function test_RemovedCandidate_CannotBeVotedFor() public {
+        e.createCandidates(candidate1, "Alice");
+        e.registerVoters(20, voter1);
+        e.getElectionStarted();
+        e.removeCandidates(candidate1);
+
+        vm.prank(voter1);
+        vm.expectRevert(election.thisCandidateIsDeleted.selector);
+        e.vote(candidate1);
+    }
+}
