@@ -121,4 +121,48 @@ contract ElectionTest is Test {
         vm.expectRevert(election.partyDoesNotExist.selector);
         e.assignCandidateToParty(candidate1, 1);
     }
+
+    // ---- Step 5: Election lifecycle (start/end) ----
+
+    function test_GetElectionStarted_HappyPath() public {
+        e.getElectionStarted();
+        assertTrue(e.isElectionActive());
+    }
+
+    function test_RevertWhen_NonChairmanStartsElection() public {
+        vm.prank(candidate1);
+        vm.expectRevert(election.Election__notChairmanError.selector);
+        e.getElectionStarted();
+    }
+
+    function test_RevertWhen_ElectionStartedTwice() public {
+        e.getElectionStarted();
+        vm.expectRevert(election.electionAlreadyStarted.selector);
+        e.getElectionStarted();
+    }
+
+    function test_EndElection_HappyPath() public {
+        e.getElectionStarted();
+        e.endElection();
+        assertFalse(e.isElectionActive());
+    }
+
+    function test_RevertWhen_EndingElectionNotStarted() public {
+        vm.expectRevert(election.electionNotStarted.selector);
+        e.endElection();
+    }
+
+    function test_RevertWhen_EndingElectionTwice() public {
+        e.getElectionStarted();
+        e.endElection();
+        vm.expectRevert(election.electionAlreadyEnded.selector);
+        e.endElection();
+    }
+
+    function test_RevertWhen_NonChairmanEndsElection() public {
+        e.getElectionStarted();
+        vm.prank(candidate1);
+        vm.expectRevert(election.Election__notChairmanError.selector);
+        e.endElection();
+    }
 }
